@@ -1,0 +1,40 @@
+{
+  "actions": {
+    "getUsers": {
+      "description": "List all non-system users",
+      "script": "dscl . -list /Users UniqueID | awk '$2 >= 500 {print $1}'"
+    },
+    "createUser": {
+      "description": "Create user and skip first-login setup wizard",
+      "vars": {
+        "USERNAME": "testuser",
+        "FULLNAME": "Test User",
+        "PASSWORD": "TestPassword123",
+        "UNIQUE_ID": "1001"
+      },
+      "script": "sudo -S dscl . -create /Users/testuser && sudo -S dscl . -create /Users/testuser UserShell /bin/bash && sudo -S dscl . -create /Users/testuser RealName 'Test User' && sudo -S dscl . -create /Users/testuser UniqueID 1001 && sudo -S dscl . -create /Users/testuser PrimaryGroupID 20 && sudo -S dscl . -create /Users/testuser NFSHomeDirectory /Users/testuser && sudo -S dscl . -passwd /Users/testuser 'TestPassword123' && sudo -S createhomedir -c -u testuser && sudo -S defaults write /Users/testuser/Library/Preferences/com.apple.SetupAssistant DidSeeCloudSetup -bool TRUE && sudo -S defaults write /Users/testuser/Library/Preferences/com.apple.SetupAssistant GestureMovieSeen none && sudo -S defaults write /Users/testuser/Library/Preferences/com.apple.SetupAssistant LastSeenCloudProductVersion 15.0 && sudo -S chown testuser /Users/testuser/Library/Preferences/com.apple.SetupAssistant.plist && echo 'User created successfully'"
+    },
+    "changePassword": {
+      "description": "Change user password",
+      "vars": {
+        "USERNAME": "testuser",
+        "NEW_PASSWORD": "NewPassword123"
+      },
+      "script": "sudo -S dscl . -passwd /Users/testuser 'NewPassword123' && echo 'Password changed successfully'"
+    },
+    "deleteUser": {
+      "description": "Delete user and home folder",
+      "vars": {
+        "USERNAME": "testuser"
+      },
+      "script": "sudo -S dscl . -delete /Users/testuser && sudo -S rm -rf /Users/testuser && echo 'User deleted successfully'"
+    },
+    "changeWallpaper": {
+      "description": "Change wallpaper for currently logged in user",
+      "vars": {
+        "IMAGE_URL": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Stonehenge.jpg/1920px-Stonehenge.jpg"
+      },
+      "script": "curl -L -o /tmp/wallpaper.jpg 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Stonehenge.jpg/1920px-Stonehenge.jpg' && LOGGED_USER=$(stat -f '%Su' /dev/console) && USER_ID=$(id -u $LOGGED_USER) && sudo -S launchctl asuser $USER_ID sudo -u $LOGGED_USER osascript -e 'tell application \"Finder\" to set desktop picture to POSIX file \"/tmp/wallpaper.jpg\"' && echo 'Wallpaper changed successfully'"
+    }
+  }
+}
