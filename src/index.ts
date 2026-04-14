@@ -1,7 +1,8 @@
 import "dotenv/config";
-import http from "node:http";
+import express from "express";
 import PQueue from "p-queue";
-import { getCredentialsList, runScript } from "./ssh-executor";
+import { runScript } from "./ssh-executor";
+import https from "node:https";
 
 const CONCURRENCY = Number(process.env.SSH_CONCURRENCY ?? 50);
 const MAX_QUEUE = Number(process.env.SSH_MAX_QUEUE ?? 500);
@@ -9,67 +10,141 @@ const queue = new PQueue({ concurrency: CONCURRENCY });
 
 const PORT = Number(process.env.PORT ?? 3022);
 const SECRET = process.env.SSH_RUNNER_SECRET ?? "";
+const API_BASE_URL = process.env.UNIFI_API_BASE_URL ?? "https://192.168.1.1/proxy/network/api/s/default";
+const API_KEY = process.env.UNIFI_API_KEY ?? "Cdq4u6nk37CjqY_LQHgSeEtdP9kkTHvf";
+const MAC_ADDRESS_REGEX = /^([0-9a-f]{2}:){5}[0-9a-f]{2}$/i;
 
 type RunPayload = {
   ip: string;
   script: string;
 };
 
-const isAuthorized = (req: http.IncomingMessage): boolean => {
-  if (!SECRET) return true;
-  return req.headers["authorization"] === `Bearer ${SECRET}`;
-};
+const app = express();
 
-const readBody = (req: http.IncomingMessage): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    req.on("data", (chunk: Buffer) => chunks.push(chunk));
-    req.on("end", () => resolve(Buffer.concat(chunks).toString()));
+app.use(express.json());
+
+
+function proxyUnifiRequest(path: string): Promise<{ statusCode: number; contentType: string; body: string }> {
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      `${API_BASE_URL}${path}`,
+      {
+        method: "GET",
+        headers: {
+          "X-API-KEY": API_KEY,
+        },
+        rejectUnauthorized: false,
+      },
+      (apiRes) => {
+        let data = "";
+
+        apiRes.on("data", (chunk: Buffer) => {
+          data += chunk.toString();
+        });
+
+        apiRes.on("end", () => {
+          resolve({
+            statusCode: apiRes.statusCode || 500,
+            contentType: apiRes.headers["content-type"] || "",
+            body: data,
+          });
+        });
+      },
+    );
+
     req.on("error", reject);
+    req.end();
   });
+}
 
-const sendJson = (res: http.ServerResponse, status: number, body: unknown) => {
-  const payload = JSON.stringify(body);
-  res.writeHead(status, {
-    "Content-Type": "application/json",
-    "Content-Length": Buffer.byteLength(payload),
+// Info route
+app.get("/", (_req, res) => {
+  res.json({
+    ok: true,
+    message: "Use POST /run, GET /stations, or GET /user/:mac",
   });
-  res.end(payload);
-};
+});
 
-const handleRun = async (
-  req: http.IncomingMessage,
-  res: http.ServerResponse,
-) => {
+app.post("/run", async (req, res) => {
+  if (!SECRET) {
+    throw new Error("Missing SSH_RUNNER_SECRET");
+  }
+  const authHeader = req.headers.authorization;
+  if (authHeader !== `Bearer ${SECRET}`) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
   if (queue.size >= MAX_QUEUE) {
-    sendJson(res, 429, { error: "Too many requests, try again later" });
+    res.status(429).json({ error: "Too many requests, try again later" });
     return;
   }
 
-  const raw = await readBody(req);
-  const { ip, script } = JSON.parse(raw) as RunPayload;
+  const { ip, script } = req.body as RunPayload;
 
   try {
     const result = await queue.add(() => runScript({ ip, script }));
-    sendJson(res, 200, result);
+    res.status(200).json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    sendJson(res, 500, { error: message });
+    res.status(500).json({ error: message });
   }
-};
-
-const server = http.createServer(async (req, res) => {
-  if (!isAuthorized(req)) {
-    sendJson(res, 401, { error: "Unauthorized" });
-    return;
-  }
-  if (req.method === "POST" && req.url === "/run") {
-    await handleRun(req, res);
-    return;
-  }
-  sendJson(res, 404, { error: "Not found" });
 });
 
-server.listen(PORT, () => {
+app.get("/stations", async (_req, res) => {
+  try {
+    const response = await proxyUnifiRequest("/stat/sta");
+    res.status(response.statusCode);
+
+    if (response.contentType.includes("application/json")) {
+      res.json(JSON.parse(response.body));
+      return;
+    }
+
+    res.type("text/plain").send(response.body);
+  } catch (error) {
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
+app.get("/user/:mac", async (req, res) => {
+  const mac = req.params.mac.toLocaleLowerCase();
+  console.log("fdsfds")
+
+  if (!MAC_ADDRESS_REGEX.test(mac)) {
+    res.status(400).json({
+      error: "Invalid MAC address. Expected format: e4:24:6c:86:24:dd",
+    });
+    return;
+  }
+
+  try {
+    const response = await proxyUnifiRequest(`/stat/user/${encodeURIComponent(mac)}`);
+    res.status(response.statusCode);
+
+    if (response.contentType.includes("application/json")) {
+      res.json(JSON.parse(response.body));
+      return;
+    }
+
+    res.type("text/plain").send(response.body);
+  } catch (error) {
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
+app.use((req, res) => {
+  res.status(404).json({ error: "Not found" });
+});
+
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const message = err instanceof Error ? err.message : "Unknown error";
+  res.status(500).json({ error: message });
+});
+
+app.listen(PORT, () => {
   console.log(`SSH runner service listening on port ${PORT}`);
 });
