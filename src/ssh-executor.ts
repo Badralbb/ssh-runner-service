@@ -34,6 +34,7 @@ export const runScript = async ({
   script,
 }: SshConfig): Promise<SshResult> => {
   const credsList = getCredentialsList();
+
   let lastError: unknown;
 
   for (const creds of credsList) {
