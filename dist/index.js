@@ -18,17 +18,6 @@ const API_KEY = process.env.UNIFI_API_KEY ?? "Cdq4u6nk37CjqY_LQHgSeEtdP9kkTHvf";
 const MAC_ADDRESS_REGEX = /^([0-9a-f]{2}:){5}[0-9a-f]{2}$/i;
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
-app.use((req, res, next) => {
-    if (!SECRET) {
-        throw new Error("Missing SSH_RUNNER_SECRET");
-    }
-    const authHeader = req.headers.authorization;
-    if (authHeader !== `Bearer ${SECRET}`) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
-    }
-    next();
-});
 function proxyUnifiRequest(path) {
     return new Promise((resolve, reject) => {
         const req = node_https_1.default.request(`${API_BASE_URL}${path}`, {
@@ -62,6 +51,14 @@ app.get("/", (_req, res) => {
     });
 });
 app.post("/run", async (req, res) => {
+    if (!SECRET) {
+        throw new Error("Missing SSH_RUNNER_SECRET");
+    }
+    const authHeader = req.headers.authorization;
+    if (authHeader !== `Bearer ${SECRET}`) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+    }
     if (queue.size >= MAX_QUEUE) {
         res.status(429).json({ error: "Too many requests, try again later" });
         return;
@@ -94,6 +91,7 @@ app.get("/stations", async (_req, res) => {
 });
 app.get("/user/:mac", async (req, res) => {
     const mac = req.params.mac.toLocaleLowerCase();
+    console.log("fdsfds");
     if (!MAC_ADDRESS_REGEX.test(mac)) {
         res.status(400).json({
             error: "Invalid MAC address. Expected format: e4:24:6c:86:24:dd",
