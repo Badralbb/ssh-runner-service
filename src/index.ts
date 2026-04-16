@@ -82,7 +82,12 @@ app.post("/run", async (req, res) => {
   const { ip, script } = req.body as RunPayload;
 
   try {
-    const result = await queue.add(() => runScript({ ip, script }));
+    const result = await queue.add(async () => {
+      const startTime = Date.now();
+      const output = await runScript({ ip, script });
+      const endTime = Date.now();
+      return { output, metrics: { startTime, endTime, durationMs: endTime - startTime } };
+    });
     res.status(200).json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

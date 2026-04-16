@@ -24,9 +24,9 @@ curl -s -X POST "$SERVER/run" \
   | python3 -m json.tool
 
 
-curl -X POST https://carey-snowboard-everything-grew.trycloudflare.com/run \
+curl -X POST https://api.pinebaatars.mn/run \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $SSH_RUNNER_SECRET" \
+  -H "Authorization: Bearer b54906aaea7a62424c32fabfe13ac4a2" \
   -d '{
     "ip": "192.168.1.10",
     "script": "sudo -S sysadminctl -addUser test-user -fullName \"Test User\" -password \"somepassword123\""
