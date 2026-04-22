@@ -32,3 +32,7 @@ curl -X POST https://api.pinebaatars.mn/run \
     "script": "sudo -S sysadminctl -addUser test-user -fullName \"Test User\" -password \"somepassword123\""
   }'
 
+
+pm2 start npm --name ssh-runner-service -- run dev   
+
+pm2 start cloudflared --name ssh-tunnel -- tunnel run ssh-runner-service

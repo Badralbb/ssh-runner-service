@@ -142,3 +142,8 @@ pm2 save
 curl http://192.168.11.253:3022/
 # Expected: {"ok":true,"message":"Use POST /run, GET /stations, or GET /user/:mac"}
 ```
+
+## Connect to SSH Runner Service
+
+ssh admin@192.168.20.155
+enter mac mini's password
