@@ -51,6 +51,10 @@ export const runScript = async ({
         stdin: `${creds.password}\n`,
         execOptions: {
           pty: true,
+          env: {
+            ADMIN_USER: creds.username,
+            ADMIN_PASSWORD: creds.password,
+          },
         },
       });
       ssh.dispose();
