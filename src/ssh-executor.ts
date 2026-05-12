@@ -46,8 +46,12 @@ export const runScript = async ({
         password: creds.password,
         readyTimeout: 8000,
       });
+
+      const replacedScript = script
+        .replace("ADMIN_USER", creds.username)
+        .replace("ADMIN_PASSWORD", creds.password);
       // Feed password via stdin so sudo -S works inside scripts that call sudo
-      const result = await ssh.execCommand(script, {
+      const result = await ssh.execCommand(replacedScript, {
         stdin: `${creds.password}\n`,
         execOptions: {
           pty: true,
