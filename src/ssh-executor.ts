@@ -49,6 +49,9 @@ export const runScript = async ({
       // Feed password via stdin so sudo -S works inside scripts that call sudo
       const result = await ssh.execCommand(script, {
         stdin: `${creds.password}\n`,
+        execOptions: {
+          pty: true,
+        },
       });
       ssh.dispose();
       return {
