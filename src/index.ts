@@ -10,7 +10,9 @@ const queue = new PQueue({ concurrency: CONCURRENCY });
 
 const PORT = Number(process.env.PORT ?? 3022);
 const SECRET = process.env.SSH_RUNNER_SECRET ?? "";
-const API_BASE_URL = process.env.UNIFI_API_BASE_URL ?? "https://192.168.1.1/proxy/network/api/s/default";
+const API_BASE_URL =
+  process.env.UNIFI_API_BASE_URL ??
+  "https://192.168.1.1/proxy/network/api/s/default";
 const API_KEY = process.env.UNIFI_API_KEY ?? "Cdq4u6nk37CjqY_LQHgSeEtdP9kkTHvf";
 const MAC_ADDRESS_REGEX = /^([0-9a-f]{2}:){5}[0-9a-f]{2}$/i;
 
@@ -23,8 +25,9 @@ const app = express();
 
 app.use(express.json());
 
-
-function proxyUnifiRequest(path: string): Promise<{ statusCode: number; contentType: string; body: string }> {
+function proxyUnifiRequest(
+  path: string,
+): Promise<{ statusCode: number; contentType: string; body: string }> {
   return new Promise((resolve, reject) => {
     const req = https.request(
       `${API_BASE_URL}${path}`,
@@ -88,8 +91,10 @@ app.post("/run", async (req, res) => {
     const result = await queue.add(async () => {
       startTime = Date.now();
       const output = await runScript({ ip, script });
+
+      console.log(output, "hello");
       endTime = Date.now();
-      return { ...output, durationMs: endTime - startTime }
+      return { ...output, durationMs: endTime - startTime };
     });
     res.status(200).json(result);
   } catch (err) {
@@ -118,7 +123,6 @@ app.get("/stations", async (_req, res) => {
 
 app.get("/user/:mac", async (req, res) => {
   const mac = req.params.mac.toLocaleLowerCase();
-  console.log("fdsfds")
 
   if (!MAC_ADDRESS_REGEX.test(mac)) {
     res.status(400).json({
@@ -128,7 +132,9 @@ app.get("/user/:mac", async (req, res) => {
   }
 
   try {
-    const response = await proxyUnifiRequest(`/stat/user/${encodeURIComponent(mac)}`);
+    const response = await proxyUnifiRequest(
+      `/stat/user/${encodeURIComponent(mac)}`,
+    );
     res.status(response.statusCode);
 
     if (response.contentType.includes("application/json")) {
@@ -148,10 +154,17 @@ app.use((req, res) => {
   res.status(404).json({ error: "Not found" });
 });
 
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  const message = err instanceof Error ? err.message : "Unknown error";
-  res.status(500).json({ error: message });
-});
+app.use(
+  (
+    err: any,
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: message });
+  },
+);
 
 app.listen(PORT, () => {
   console.log(`SSH runner service listening on port ${PORT}`);

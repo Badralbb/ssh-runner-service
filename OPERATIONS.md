@@ -146,4 +146,12 @@ curl http://192.168.11.253:3022/
 ## Connect to SSH Runner Service
 
 ssh admin@192.168.20.155
+
+1c:f6:4c:40:89:a5
+
 enter mac mini's password
+
+
+ping -c 3 255.255.255.255
+
+ arp -a | grep "1c:f6:4c:40:89:a5"
